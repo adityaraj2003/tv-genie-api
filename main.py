@@ -11,7 +11,8 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello():
-    return 'API is up and Running Usage - GET: /schedule?channel=marvel-hq'
+    return jsonify({"status" : "running",
+    "usage" : "GET: /schedule?channel=star-plus"})
 
 
 
@@ -21,5 +22,8 @@ def hello():
 @app.route('/schedule')
 def schedule():
     channel =  request.args.get('channel')
-    return jsonify(getEPGData(channel)) 
+    if channel is not None:
+        return jsonify(getEPGData(channel)) 
+    else:
+        return jsonify({"error" : "No Channel Provided in the url"})
 
