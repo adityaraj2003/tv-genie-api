@@ -24,6 +24,8 @@ def schedule():
     channel =  request.args.get('channel')
     if channel is not None:
         return jsonify(getEPGData(channel)) 
+    elif channel == "":
+        return jsonify({"error" : "No Channel Provided in the url"})
     else:
         return jsonify({"error" : "No Channel Provided in the url"})
 
