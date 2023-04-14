@@ -1,71 +1,61 @@
+
+
+import requests
 import json
-from urllib.request import urlopen , Request
 from datetime import date
 
 from utils import *
 
+def get_epg_data(channel):
+    try:
+        url = f"https://web.scraper.workers.dev/?url=https%3A%2F%2Ftvgenie.in%2F{channel}-schedule&selector=tr&scrape=text&pretty=true"
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response.raise_for_status()
+        data_json = response.json()
 
-def getEPGData(channel):
-    url = f"https://web.scraper.workers.dev/?url=https%3A%2F%2Ftvgenie.in%2F{channel}-schedule&selector=tr&scrape=text&pretty=true"
-    response = urlopen(Request(url, headers={'User-Agent': 'Mozilla/5.0'}))
-    data_json = json.loads(response.read())
+        epg_data = []
 
+        for item in data_json['result']['tr']:
+            item = item.replace('&nbsp;', '').replace('&amp;', '')
+            if "Today" in item:
+                item = item.replace(", Today", "")
+                item = item.split()
 
+                start_time = f"{item[-2]} {item[-1]}"
+                if int(item[-2].split(":")[0]) < 10:
+                    start_time = f"0{start_time}"
 
+                if "E" not in item[-3]:
+                    episode_number = "N/A"
+                    show_name = item[:-2]
+                else:
+                    episode_number = item[-3]
+                    show_name = item[:-3]
 
+                show = " ".join(show_name)
 
-    data = {
-        'epg' : [
-        ]
-    }
+                epg_data.append({
+                    'showName': show.rstrip(),
+                    'startTime': convert_24(start_time).rstrip() + ":00",
+                    'episodeNum': episode_number,
+                    'date': date.today().strftime("%Y-%m-%d")
+                })
 
-    for i in data_json['result']['tr']:
-      i = i.replace('&nbsp;' , '')
-      i = i.replace('&amp; ' , '')
-      if "Today" in i:
-        i = i.replace(", Today" , "")
-        i = i.split()
+        for index, item in enumerate(epg_data[:-1]):
+            end_time = epg_data[index + 1]["startTime"]
+            start_time_utc = get_tplay_time(item["startTime"], "05:30:00", item["date"])
+            end_time_utc = get_tplay_time(epg_data[index + 1]["startTime"], "05:30:00", item["date"])
+            duration = get_time_difference(item["startTime"], epg_data[index + 1]["startTime"])
 
-        if int(i[-2].split(":")[0]) < 10:
-          startTime = "0" + str(i[-2]) + " " + i[-1]
+            item.update({
+                "endTime": end_time,
+                'utcStartTimeStamp': start_time_utc,
+                'utcEndTimeStamp': end_time_utc,
+                'duration': duration
+            })
 
-        else:
-          startTime = str(i[-2]) + " " + i[-1]
+        return {'epg': epg_data}
 
-        if not "E" in i[-3]:
-          episodeNumber = "N/A"
-          showName = i[:-2]
-
-          show = ""
-          for j in showName:
-            show += j + " "
-        else:
-          episodeNumber = i[-3]
-          showName = i[:-3]
-
-          show = ""
-          for j in showName:
-            show += j + " "
-
-
-    
-
-        data['epg'].append({
-          'showName' : show.rstrip(),
-          'startTime' : convert24(startTime).rstrip() + ":00",
-          'episodeNum' : episodeNumber,
-          'date' : date.today().strftime("%Y-%m-%d")
-    })
-
-
-    for k in range(0 , len(data['epg']) - 1):
-      data['epg'][k].update({
-      "endTime" : data['epg'][k + 1]["startTime"],
-      'utcStartTimeStamp' : getTplayTime(data['epg'][k]["startTime"] , "05:30:00" , data['epg'][k]["date"]),
-      'utcEndTimeStamp' : getTplayTime(data['epg'][k + 1]["startTime"] , "05:30:00" , data['epg'][k]["date"]),
-      'duration' : getTimeDifference(data['epg'][k]["startTime"] , data['epg'][k + 1]["startTime"])
-      })
-
-
-    # complete_data = json.dumps(data , indent =2 )
-    return data
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
